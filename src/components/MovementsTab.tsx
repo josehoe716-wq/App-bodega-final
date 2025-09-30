@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package } from 'lucide-react';
+import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings } from 'lucide-react';
 import { MaterialExit } from '../types/materialExit';
 import { materialExitApi } from '../services/materialExitApi';
+import { CartExitManagementModal } from './CartExitManagementModal';
 import * as XLSX from 'xlsx';
 
 export function MovementsTab() {
@@ -9,6 +10,7 @@ export function MovementsTab() {
   const [filteredExits, setFilteredExits] = useState<MaterialExit[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isCartManagementOpen, setIsCartManagementOpen] = useState(false);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -135,14 +137,23 @@ export function MovementsTab() {
           <h2 className="text-2xl font-bold text-slate-900">Historial de Movimientos</h2>
           <p className="text-slate-600">Registro completo de salidas de materiales</p>
         </div>
-        <button
-          onClick={handleExportToExcel}
-          disabled={filteredExits.length === 0}
-          className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors"
-        >
-          <Download className="h-4 w-4" />
-          <span>Exportar Excel</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setIsCartManagementOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+            <span>Gestionar Salidas del Carrito</span>
+          </button>
+          <button
+            onClick={handleExportToExcel}
+            disabled={filteredExits.length === 0}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            <span>Exportar Excel</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -360,6 +371,11 @@ export function MovementsTab() {
           </div>
         )}
       </div>
+
+      <CartExitManagementModal
+        isOpen={isCartManagementOpen}
+        onClose={() => setIsCartManagementOpen(false)}
+      />
     </div>
   );
 }

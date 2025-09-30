@@ -16,9 +16,10 @@ interface SidebarProps {
   userRole: 'Tecnico' | 'administrador';
   onLogout: () => void;
   cartItemsCount?: number;
+  onOpenCart?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsCount = 0 }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsCount = 0, onOpenCart }: SidebarProps) {
   const adminTabs = [
     { id: 'dashboard', label: 'Panel Principal', icon: Home },
     { id: 'inventory', label: 'Inventario', icon: Package },
@@ -30,7 +31,7 @@ export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsC
 
   const technicianTabs = [
     { id: 'inventory', label: 'Inventario', icon: Package },
-    { id: 'cart', label: `Carrito (${cartItemsCount})`, icon: ShoppingCart },
+    { id: 'cart', label: 'Carrito', icon: ShoppingCart },
     { id: 'cart-history', label: 'Historial de Salidas', icon: History },
   ];
 
@@ -65,6 +66,24 @@ export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsC
         </div>
       </div>
 
+      {/* Botón flotante del carrito para técnicos */}
+      {userRole === 'Tecnico' && onOpenCart && (
+        <div className="p-4">
+          <button
+            onClick={onOpenCart}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors relative"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span>Ver Carrito</span>
+            {cartItemsCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {cartItemsCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
@@ -84,6 +103,11 @@ export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsC
                 >
                   <Icon className="h-5 w-5" />
                   <span className="font-medium">{tab.label}</span>
+                  {tab.id === 'cart' && cartItemsCount > 0 && (
+                    <span className="ml-auto bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {cartItemsCount}
+                    </span>
+                  )}
                 </button>
               </li>
             );

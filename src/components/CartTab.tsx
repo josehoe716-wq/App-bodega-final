@@ -8,43 +8,28 @@ interface CartItem {
 }
 
 interface CartTabProps {
-  cartItems: InventoryItem[];
+  cartItems: CartItem[];
   onRemoveItem: (id: number) => void;
+  onUpdateQuantity: (id: number, quantity: number) => void;
   onConfirmExit: (items: CartItem[]) => void;
   onClearCart: () => void;
 }
 
-export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }: CartTabProps) {
-  const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
+export function CartTab({ cartItems, onRemoveItem, onUpdateQuantity, onConfirmExit, onClearCart }: CartTabProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Inicializar cantidades
-  React.useEffect(() => {
-    const initialQuantities: { [key: number]: number } = {};
-    cartItems.forEach(item => {
-      if (!quantities[item.id]) {
-        initialQuantities[item.id] = 1;
-      }
-    });
-    setQuantities(prev => ({ ...prev, ...initialQuantities }));
-  }, [cartItems]);
-
   const updateQuantity = (itemId: number, newQuantity: number) => {
-    const item = cartItems.find(i => i.id === itemId);
-    if (item && newQuantity >= 1 && newQuantity <= item.stock) {
-      setQuantities(prev => ({ ...prev, [itemId]: newQuantity }));
+    const cartItem = cartItems.find(ci => ci.item.id === itemId);
+    if (cartItem && newQuantity >= 1 && newQuantity <= cartItem.item.stock) {
+      onUpdateQuantity(itemId, newQuantity);
     }
   };
 
   const handleConfirm = async () => {
     setIsProcessing(true);
-    const cartItemsWithQuantities: CartItem[] = cartItems.map(item => ({
-      item,
-      quantity: quantities[item.id] || 1
-    }));
     
     try {
-      await onConfirmExit(cartItemsWithQuantities);
+      await onConfirmExit(cartItems);
     } catch (error) {
       console.error('Error processing cart:', error);
     } finally {
@@ -52,7 +37,7 @@ export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }:
     }
   };
 
-  const totalItems = cartItems.reduce((sum, item) => sum + (quantities[item.id] || 1), 0);
+  const totalItems = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
   return (
     <div className="space-y-6">
@@ -100,33 +85,33 @@ export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }:
             </div>
             <div className="divide-y divide-slate-200">
               {cartItems.map((item) => {
-                const quantity = quantities[item.id] || 1;
-                const maxQuantity = item.stock;
+                const quantity = item.quantity;
+                const maxQuantity = item.item.stock;
                 
                 return (
-                  <div key={item.id} className="p-6">
+                  <div key={item.item.id} className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-3">
                           <div className={`p-2 rounded-lg ${
-                            item.tipo === 'ERSA' ? 'bg-red-100' : 'bg-blue-100'
+                            item.item.tipo === 'ERSA' ? 'bg-red-100' : 'bg-blue-100'
                           }`}>
                             <Package className={`h-5 w-5 ${
-                              item.tipo === 'ERSA' ? 'text-red-600' : 'text-blue-600'
+                              item.item.tipo === 'ERSA' ? 'text-red-600' : 'text-blue-600'
                             }`} />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-1">
                               <span className={`px-2 py-1 text-xs font-medium rounded ${
-                                item.tipo === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                item.item.tipo === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                               }`}>
-                                {item.tipo}
+                                {item.item.tipo}
                               </span>
-                              <span className="text-xs text-slate-500">#{item.codigo}</span>
+                              <span className="text-xs text-slate-500">#{item.item.codigo}</span>
                             </div>
-                            <h4 className="font-semibold text-slate-900 mb-1">{item.nombre}</h4>
+                            <h4 className="font-semibold text-slate-900 mb-1">{item.item.nombre}</h4>
                             <p className="text-sm text-slate-600">
-                              Ubicación: {item.ubicacion} | Stock disponible: {item.stock} {item.unidad}
+                              Ubicación: {item.item.ubicacion} | Stock disponible: {item.item.stock} {item.item.unidad}
                             </p>
                           </div>
                         </div>
@@ -138,7 +123,7 @@ export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }:
                           <span className="text-sm font-medium text-slate-700">Cantidad:</span>
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => updateQuantity(item.id, quantity - 1)}
+                              onClick={() => updateQuantity(item.item.id, quantity - 1)}
                               disabled={quantity <= 1}
                               className="p-1 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
@@ -148,14 +133,14 @@ export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }:
                               <input
                                 type="number"
                                 value={quantity}
-                                onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                onChange={(e) => updateQuantity(item.item.id, parseInt(e.target.value) || 1)}
                                 min="1"
                                 max={maxQuantity}
                                 className="w-16 text-center font-medium border border-slate-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                             <button
-                              onClick={() => updateQuantity(item.id, quantity + 1)}
+                              onClick={() => updateQuantity(item.item.id, quantity + 1)}
                               disabled={quantity >= maxQuantity}
                               className="p-1 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
@@ -166,7 +151,7 @@ export function CartTab({ cartItems, onRemoveItem, onConfirmExit, onClearCart }:
                         
                         {/* Botón eliminar */}
                         <button
-                          onClick={() => onRemoveItem(item.id)}
+                          onClick={() => onRemoveItem(item.item.id)}
                           className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
                           title="Eliminar del carrito"
                         >

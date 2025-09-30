@@ -30,10 +30,10 @@ function App() {
   const [isImporting, setIsImporting] = useState(false);
 
   // Estados del carrito
-  //const [cartItems, setCartItems] = useState<InventoryItem[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isMultiExitModalOpen, setIsMultiExitModalOpen] = useState(false);
   const [isProcessingMultiExit, setIsProcessingMultiExit] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
   // Estado para el código de registro
   const [registryCode, setRegistryCode] = useState('');
@@ -102,17 +102,34 @@ function App() {
   // Funciones del carrito
   const handleAddToCart = (item: InventoryItem) => {
     setCartItems(prev => {
-      if (prev.find(i => i.id === item.id)) return prev;
-      return [...prev, item];
+      const existingItem = prev.find(cartItem => cartItem.item.id === item.id);
+      if (existingItem) {
+        return prev.map(cartItem =>
+          cartItem.item.id === item.id
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        );
+      }
+      return [...prev, { item, quantity: 1 }];
     });
   };
 
   const handleRemoveFromCart = (id: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
+    setCartItems(prev => prev.filter(cartItem => cartItem.item.id !== id));
+  };
+
+  const handleUpdateCartQuantity = (id: number, quantity: number) => {
+    setCartItems(prev =>
+      prev.map(cartItem =>
+        cartItem.item.id === id
+          ? { ...cartItem, quantity }
+          : cartItem
+      )
+    );
   };
 
   const handleCartConfirm = (items: CartItem[]) => {
-  const newCode = registryApi.getNextRegistryCode(); // genera el código único
+    const newCode = registryApi.getNextRegistryCode();
     setRegistryCode(newCode); // lo guarda en el estado
     setIsMultiExitModalOpen(true); // abre el modal
   };
@@ -122,52 +139,51 @@ function App() {
   };
 
   const handleMultiMaterialExit = async (exitData: NewCartExit, cartItemsWithQuantities: CartItem[]) => {
-  try {
-    setIsProcessingMultiExit(true);
+    try {
+      setIsProcessingMultiExit(true);
 
-    // Crear la lista de materiales del carrito
-    const materials = cartItemsWithQuantities.map(cartItem => ({
-      materialId: cartItem.item.id,
-      quantity: cartItem.quantity
-    }));
+      // Crear la lista de materiales del carrito
+      const materials = cartItemsWithQuantities.map(cartItem => ({
+        materialId: cartItem.item.id,
+        quantity: cartItem.quantity
+      }));
 
-    // Generar un nuevo código de registro
-    const newCode = registryApi.getNextRegistryCode();
+      // Crear la salida del carrito con el código incluido
+      const newCartExit = await cartExitApi.create(
+        {
+          ...exitData,
+          materials
+        },
+        cartItemsWithQuantities.map(ci => ci.item)
+      );
 
-    // Crear la salida del carrito con el código incluido
-    const newCartExit = await cartExitApi.create(
-      {
-        ...exitData,
-        registryCode: newCode, // 👈 agregamos el código único
-        materials
-      },
-      cartItemsWithQuantities.map(ci => ci.item)
-    );
+      // Actualizar el stock de cada material
+      for (const cartItem of cartItemsWithQuantities) {
+        const newStock = cartItem.item.stock - cartItem.quantity;
+        await inventoryApi.updateStock(cartItem.item.id, newStock);
+      }
 
-    // Actualizar el stock de cada material
-    for (const cartItem of cartItemsWithQuantities) {
-      const newStock = cartItem.item.stock - cartItem.quantity;
-      await inventoryApi.updateStock(cartItem.item.id, newStock);
+      // Recargar inventario
+      await loadInventory();
+
+      // Limpiar carrito y cerrar modales
+      setCartItems([]);
+      setIsMultiExitModalOpen(false);
+
+      // Mostrar mensaje de éxito con el código generado
+      alert(`Salida registrada exitosamente con código: ${newCartExit.registryCode}`);
+
+    } catch (error) {
+      console.error('Error processing multi-material exit:', error);
+      alert('Error al procesar la salida de materiales');
+    } finally {
+      setIsProcessingMultiExit(false);
     }
+  };
 
-    // Recargar inventario
-    await loadInventory();
-
-    // Limpiar carrito y cerrar modales
-    setCartItems([]);
-    setIsMultiExitModalOpen(false);
-
-    // Mostrar mensaje de éxito con el código generado
-    alert(`Salida registrada exitosamente con código: ${newCartExit.registryCode}`);
-
-  } catch (error) {
-    console.error('Error processing multi-material exit:', error);
-    alert('Error al procesar la salida de materiales');
-  } finally {
-    setIsProcessingMultiExit(false);
-  }
-};
-
+  const handleOpenCartModal = () => {
+    setIsCartModalOpen(true);
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -201,6 +217,7 @@ function App() {
           <CartTab
             cartItems={cartItems}
             onRemoveItem={handleRemoveFromCart}
+            onUpdateQuantity={handleUpdateCartQuantity}
             onConfirmExit={handleCartConfirm}
             onClearCart={clearCart}
           />
@@ -241,7 +258,8 @@ function App() {
         onTabChange={setActiveTab}
         userRole={userRole}
         onLogout={handleLogout}
-        cartItemsCount={cartItems.length}
+        cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+        onOpenCart={userRole === 'Tecnico' ? handleOpenCartModal : undefined}
       />
       
       <div className="flex-1 overflow-auto">
@@ -250,14 +268,23 @@ function App() {
         </main>
       </div>
 
+      {/* Modal del carrito */}
+      <CartModal
+        isOpen={isCartModalOpen}
+        onClose={() => setIsCartModalOpen(false)}
+        cartItems={cartItems}
+        onRemoveItem={handleRemoveFromCart}
+        onUpdateQuantity={handleUpdateCartQuantity}
+        onConfirmExit={handleCartConfirm}
+      />
+
       {/* Modal de salida múltiple */}
       <MultiMaterialExitModal
         isOpen={isMultiExitModalOpen}
         onClose={() => setIsMultiExitModalOpen(false)}
         onConfirm={handleMultiMaterialExit}
-        cartItems={cartItems.map(item => ({ item, quantity: 1 }))}
+        cartItems={cartItems}
         isProcessing={isProcessingMultiExit}
-        registryCode={registryCode}
       />
 
     </div>

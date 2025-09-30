@@ -10,9 +10,10 @@ interface CartItem {
 interface CartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  cartItems: InventoryItem[];
+  cartItems: CartItem[];
   onRemoveItem: (id: number) => void;
-  onConfirmExit?: (items: CartItem[]) => void;
+  onUpdateQuantity: (id: number, quantity: number) => void;
+  onConfirmExit: (items: CartItem[]) => void;
 }
 
 export const CartModal: React.FC<CartModalProps> = ({
@@ -20,43 +21,22 @@ export const CartModal: React.FC<CartModalProps> = ({
   onClose,
   cartItems,
   onRemoveItem,
+  onUpdateQuantity,
   onConfirmExit,
 }) => {
-  const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Inicializar cantidades cuando se abra el modal
-  React.useEffect(() => {
-    if (isOpen && cartItems.length > 0) {
-      const initialQuantities: { [key: number]: number } = {};
-      cartItems.forEach(item => {
-        if (!quantities[item.id]) {
-          initialQuantities[item.id] = 1;
-        }
-      });
-      setQuantities(prev => ({ ...prev, ...initialQuantities }));
-    }
-  }, [isOpen, cartItems]);
-
   const updateQuantity = (itemId: number, newQuantity: number) => {
-    const item = cartItems.find(i => i.id === itemId);
-    if (item && newQuantity >= 1 && newQuantity <= item.stock) {
-      setQuantities(prev => ({ ...prev, [itemId]: newQuantity }));
+    const cartItem = cartItems.find(ci => ci.item.id === itemId);
+    if (cartItem && newQuantity >= 1 && newQuantity <= cartItem.item.stock) {
+      onUpdateQuantity(itemId, newQuantity);
     }
   };
 
   const handleConfirm = async () => {
-    if (!onConfirmExit) return;
-    
     setIsProcessing(true);
-    const cartItemsWithQuantities: CartItem[] = cartItems.map(item => ({
-      item,
-      quantity: quantities[item.id] || 1
-    }));
-    
     try {
-      await onConfirmExit(cartItemsWithQuantities);
-      setQuantities({});
+      await onConfirmExit(cartItems);
       onClose();
     } catch (error) {
       console.error('Error processing cart:', error);
@@ -65,10 +45,7 @@ export const CartModal: React.FC<CartModalProps> = ({
     }
   };
 
-  const handleClose = () => {
-    setQuantities({});
-    onClose();
-  };
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   if (!isOpen) return null;
 
@@ -81,11 +58,11 @@ export const CartModal: React.FC<CartModalProps> = ({
               <ShoppingCart className="h-5 w-5 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-slate-900">
-              Carrito de Materiales ({cartItems.length})
+              Carrito de Materiales ({cartItems.length} tipos, {totalItems} unidades)
             </h2>
           </div>
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X className="h-5 w-5" />
@@ -107,27 +84,26 @@ export const CartModal: React.FC<CartModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {cartItems.map((item) => {
-                const quantity = quantities[item.id] || 1;
-                const maxQuantity = item.stock;
+              {cartItems.map((cartItem) => {
+                const maxQuantity = cartItem.item.stock;
                 
                 return (
                   <div
-                    key={item.id}
+                    key={cartItem.item.id}
                     className="flex items-center justify-between border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
                         <span className={`px-2 py-1 text-xs font-medium rounded ${
-                          item.tipo === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                          cartItem.item.tipo === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {item.tipo}
+                          {cartItem.item.tipo}
                         </span>
-                        <span className="text-xs text-slate-500">#{item.codigo}</span>
+                        <span className="text-xs text-slate-500">#{cartItem.item.codigo}</span>
                       </div>
-                      <h4 className="font-medium text-slate-900 mb-1">{item.nombre}</h4>
+                      <h4 className="font-medium text-slate-900 mb-1">{cartItem.item.nombre}</h4>
                       <p className="text-sm text-slate-600">
-                        Ubicación: {item.ubicacion} | Stock disponible: {item.stock} {item.unidad}
+                        Ubicación: {cartItem.item.ubicacion} | Stock disponible: {cartItem.item.stock} {cartItem.item.unidad}
                       </p>
                     </div>
                     
@@ -135,16 +111,25 @@ export const CartModal: React.FC<CartModalProps> = ({
                       {/* Control de cantidad */}
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => updateQuantity(item.id, quantity - 1)}
-                          disabled={quantity <= 1}
+                          onClick={() => updateQuantity(cartItem.item.id, cartItem.quantity - 1)}
+                          disabled={cartItem.quantity <= 1}
                           className="p-1 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
-                        <span className="w-12 text-center font-medium">{quantity}</span>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={cartItem.quantity}
+                            onChange={(e) => updateQuantity(cartItem.item.id, parseInt(e.target.value) || 1)}
+                            min="1"
+                            max={maxQuantity}
+                            className="w-16 text-center font-medium border border-slate-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
                         <button
-                          onClick={() => updateQuantity(item.id, quantity + 1)}
-                          disabled={quantity >= maxQuantity}
+                          onClick={() => updateQuantity(cartItem.item.id, cartItem.quantity + 1)}
+                          disabled={cartItem.quantity >= maxQuantity}
                           className="p-1 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Plus className="h-4 w-4" />
@@ -153,7 +138,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                       
                       {/* Botón eliminar */}
                       <button
-                        onClick={() => onRemoveItem(item.id)}
+                        onClick={() => onRemoveItem(cartItem.item.id)}
                         className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
                         title="Eliminar del carrito"
                       >
@@ -169,13 +154,13 @@ export const CartModal: React.FC<CartModalProps> = ({
 
         <div className="flex justify-end space-x-3 p-6 border-t border-slate-200">
           <button
-            onClick={handleClose}
+            onClick={onClose}
             disabled={isProcessing}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-800 rounded-lg transition-colors"
           >
             Cerrar
           </button>
-          {cartItems.length > 0 && onConfirmExit && (
+          {cartItems.length > 0 && (
             <button
               onClick={handleConfirm}
               disabled={isProcessing}
@@ -189,7 +174,7 @@ export const CartModal: React.FC<CartModalProps> = ({
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  <span>Confirmar Salida</span>
+                  <span>Confirmar Salida ({totalItems} unidades)</span>
                 </>
               )}
             </button>

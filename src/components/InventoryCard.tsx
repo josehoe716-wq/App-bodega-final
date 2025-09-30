@@ -25,7 +25,7 @@ export function InventoryCard({
   isDeleting = false,
   isViewerMode = false,
   userRole,
-  onAddToCart, // 👈 nuevo
+  onAddToCart,
 }: InventoryCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [newStock, setNewStock] = useState(item.stock);
@@ -233,7 +233,7 @@ export function InventoryCard({
         )}
 
         {/* Botón de carrito solo para Tecnicos */}
-        {userRole === "Tecnico" && onAddToCart && (
+        {userRole === "Tecnico" && onAddToCart && !isViewerMode && (
           <button
             onClick={() => onAddToCart?.(item)}
             className="flex items-center space-x-1 px-2 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded transition-colors"
@@ -243,7 +243,7 @@ export function InventoryCard({
           </button>
         )}
 
-        {isViewerMode && userRole !== "Tecnico" && (
+        {isViewerMode && (
           <button
             disabled
             className="flex items-center space-x-1 px-3 py-2 text-sm text-slate-400 bg-slate-50 rounded-lg cursor-not-allowed"

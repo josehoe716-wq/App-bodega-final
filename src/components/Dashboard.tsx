@@ -6,6 +6,7 @@ import { materialExitApi, cartExitApi } from '../services/materialExitApi';
 import { StatsGrid } from './StatsGrid';
 import { StockCriticalityCharts } from './StockCriticalityCharts';
 import { CategoryDistributionChart } from './CategoryDistributionChart';
+import { StockTrendsChart } from './StockTrendsChart';
 
 interface DashboardProps {
   items: InventoryItem[];
@@ -64,6 +65,9 @@ export function Dashboard({ items }: DashboardProps) {
         <StockCriticalityCharts items={items} />
         <CategoryDistributionChart items={items} />
       </div>
+
+      {/* Gráfica de tendencias de stock */}
+      <StockTrendsChart items={items} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Últimos 10 movimientos */}
