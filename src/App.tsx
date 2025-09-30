@@ -119,6 +119,7 @@ function App() {
     setIsMultiExitModalOpen(true);
   };
 
+
   const clearCart = () => {
     setCartItems([]);
   };
