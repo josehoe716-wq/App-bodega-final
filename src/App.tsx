@@ -13,6 +13,7 @@ import { InventoryItem, NewInventoryItem } from './types/inventory';
 import { inventoryApi } from './services/api';
 import { cartExitApi } from './services/materialExitApi';
 import { NewCartExit } from './types/materialExit';
+import { registryApi } from "./services/registryApi";
 
 interface CartItem {
   item: InventoryItem;
