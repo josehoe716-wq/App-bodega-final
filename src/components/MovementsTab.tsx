@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings, Edit } from 'lucide-react';
-import { MaterialExit, CartExit } from '../types/materialExit';
+import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings, CreditCard as Edit } from 'lucide-react'rt { MaterialExit, CartExit } from '../types/materialExit';
 import { materialExitApi, cartExitApi } from '../services/materialExitApi';
 import { CartExitManagementModal } from './CartExitManagementModal';
-import { EditMovementModal } from './EditMovementModal';
 import * as XLSX from 'xlsx';
 
 // Tipo unificado para mostrar todos los movimientos
@@ -42,9 +40,6 @@ export function MovementsTab() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deletingType, setDeletingType] = useState<'single' | 'cart' | null>(null);
   const [isCartManagementOpen, setIsCartManagementOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingMovement, setEditingMovement] = useState<UnifiedMovement | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -253,48 +248,6 @@ export function MovementsTab() {
     setDateTo('');
     setMovementTypeFilter('all');
     setPersonFilter('');
-  };
-
-  const handleEditMovement = (movement: UnifiedMovement) => {
-    setEditingMovement(movement);
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveMovement = async (updatedMovement: any) => {
-    try {
-      setIsSaving(true);
-      
-      if (updatedMovement.type === 'single') {
-        // Actualizar movimiento individual
-        await materialExitApi.update(updatedMovement.originalId, {
-          personName: updatedMovement.personName,
-          personLastName: updatedMovement.personLastName,
-          area: updatedMovement.area,
-          ceco: updatedMovement.ceco,
-          sapCode: updatedMovement.sapCode,
-          workOrder: updatedMovement.workOrder,
-          quantity: updatedMovement.quantity,
-        });
-      } else {
-        // Actualizar movimiento del carrito
-        await cartExitApi.update(updatedMovement.originalId, {
-          personName: updatedMovement.personName,
-          personLastName: updatedMovement.personLastName,
-          area: updatedMovement.area,
-          ceco: updatedMovement.ceco,
-          sapCode: updatedMovement.sapCode,
-          workOrder: updatedMovement.workOrder,
-        });
-      }
-      
-      await loadAllMovements();
-      setIsEditModalOpen(false);
-      setEditingMovement(null);
-    } catch (error) {
-      console.error('Error updating movement:', error);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   return (
@@ -539,27 +492,18 @@ export function MovementsTab() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditMovement(movement)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                          title="Editar movimiento"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMovement(movement)}
-                          disabled={deletingId === movement.originalId && deletingType === movement.type}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
-                          title="Eliminar registro"
-                        >
-                          {deletingId === movement.originalId && deletingType === movement.type ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDeleteMovement(movement)}
+                        disabled={deletingId === movement.originalId && deletingType === movement.type}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
+                        title="Eliminar registro"
+                      >
+                        {deletingId === movement.originalId && deletingType === movement.type ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -572,17 +516,6 @@ export function MovementsTab() {
       <CartExitManagementModal
         isOpen={isCartManagementOpen}
         onClose={() => setIsCartManagementOpen(false)}
-      />
-
-      <EditMovementModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingMovement(null);
-        }}
-        onSave={handleSaveMovement}
-        movement={editingMovement}
-        isSaving={isSaving}
       />
     </div>
   );
