@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, User, Building, Calendar, Edit3, Save, Trash2, Eye } from 'lucide-react';
+import { X, Package, User, Building, Calendar, CreditCard as Edit3, Save, Trash2, Eye } from 'lucide-react';
 import { CartExit } from '../types/materialExit';
 import { cartExitApi } from '../services/materialExitApi';
 
