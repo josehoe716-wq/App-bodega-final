@@ -34,6 +34,14 @@ function App() {
   const [isMultiExitModalOpen, setIsMultiExitModalOpen] = useState(false);
   const [isProcessingMultiExit, setIsProcessingMultiExit] = useState(false);
 
+  // Estados del carrito
+  const [cartItems, setCartItems] = useState<InventoryItem[]>([]);
+  const [isMultiExitModalOpen, setIsMultiExitModalOpen] = useState(false);
+  const [isProcessingMultiExit, setIsProcessingMultiExit] = useState(false);
+
+  // Estado para el código de registro
+  const [registryCode, setRegistryCode] = useState('');
+
   useEffect(() => {
     if (userRole) {
       loadInventory();
