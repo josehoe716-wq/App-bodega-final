@@ -116,9 +116,10 @@ function App() {
   };
 
   const handleCartConfirm = (items: CartItem[]) => {
-    setIsMultiExitModalOpen(true);
+  const newCode = registryApi.getNextRegistryCode(); // genera el código único
+    setRegistryCode(newCode); // lo guarda en el estado
+    setIsMultiExitModalOpen(true); // abre el modal
   };
-
 
   const clearCart = () => {
     setCartItems([]);
