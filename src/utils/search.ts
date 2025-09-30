@@ -16,14 +16,15 @@ export function wildcardSearch(text: string, pattern: string): boolean {
 }
 
 // Search function that handles multiple fields with wildcards
-export function searchInventoryItem(item: any, searchTerm: string): boolean {
+export function searchInventoryItem(item: InventoryItem, searchTerm: string): boolean {
   if (!searchTerm.trim()) return true;
   
   const searchFields = [
     item.nombre,
     item.codigo,
     item.ubicacion,
-    item.tipo
+    item.tipo,
+    item.categoria
   ];
   
   return searchFields.some(field => 

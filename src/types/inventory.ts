@@ -1,3 +1,5 @@
+import { InventoryItem } from './inventory';
+
 export interface InventoryItem {
   id: number;
   tipo: string;

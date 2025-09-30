@@ -30,6 +30,7 @@ export function Layout({ children }: LayoutProps) {
               <div>
                 <h1 className="text-xl font-bold text-slate-900">Mi bodega EJ-TEC</h1>
                 <p className="text-sm text-slate-600">Sistema de Gestión Industrial -  Ecuajugos S.A.</p>
+                <p className="text-xs text-slate-400 mt-1">Desarrollado por Dennis Quinche</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 text-slate-600">

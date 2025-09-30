@@ -10,13 +10,22 @@ import { CategoryView } from './components/CategoryView';
 import { SearchBar } from './components/SearchBar';
 import { StatsGrid } from './components/StatsGrid';
 import { StockCriticalityCharts } from './components/StockCriticalityCharts';
+import { StockTrendsChart } from './components/StockTrendsChart';
+import { AdvancedSearchBar } from './components/AdvancedSearchBar';
+import { MultiMaterialExitModal } from './components/MultiMaterialExitModal';
 import { InventoryItem, NewInventoryItem } from './types/inventory';
 import { AddItemModal } from './components/AddItemModal';
 import { AuthModal } from './components/AuthModal';
 import { inventoryApi } from './services/api';
+import { registryApi } from './services/registryApi';
 import { searchInventoryItem } from './utils/search';
 import * as XLSX from 'xlsx';
-import { CartModal } from "./components/CartModal";
+import { CartModal } from './components/CartModal';
+
+interface CartItem {
+  item: InventoryItem;
+  quantity: number;
+}
 
 function App() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -35,12 +44,17 @@ function App() {
   const [deletingItems, setDeletingItems] = useState<Set<number>>(new Set());
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [codeFilter, setCodeFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'critical' | 'zero'>('all');
   const [currentView, setCurrentView] = useState<'list' | 'categories'>('list');
 
-  // 👇 Estados del carrito
+  // Estados del carrito
   const [cartItems, setCartItems] = useState<InventoryItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isMultiExitModalOpen, setIsMultiExitModalOpen] = useState(false);
+  const [isProcessingMultiExit, setIsProcessingMultiExit] = useState(false);
 
   useEffect(() => {
     if (userRole) {
@@ -202,7 +216,7 @@ function App() {
     XLSX.writeFile(wb, `materiales_sin_stock_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  // 👇 Funciones del carrito
+  // Funciones del carrito
   const handleAddToCart = (item: InventoryItem) => {
     setCartItems(prev => {
       if (prev.find(i => i.id === item.id)) return prev;
@@ -214,8 +228,49 @@ function App() {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const handleCartConfirm = (items: CartItem[]) => {
+    setIsMultiExitModalOpen(true);
+  };
+
+  const handleMultiMaterialExit = async (exitData: any, cartItemsWithQuantities: CartItem[], registryCode: string) => {
+    try {
+      setIsProcessingMultiExit(true);
+      
+      // Procesar cada material del carrito
+      for (const cartItem of cartItemsWithQuantities) {
+        // Actualizar el stock del material
+        const newStock = cartItem.item.stock - cartItem.quantity;
+        await inventoryApi.updateStock(cartItem.item.id, newStock);
+      }
+      
+      // Recargar inventario
+      await loadInventory();
+      
+      // Limpiar carrito y cerrar modales
+      setCartItems([]);
+      setIsMultiExitModalOpen(false);
+      setIsCartOpen(false);
+      
+      // Mostrar mensaje de éxito
+      alert(`Salida registrada exitosamente con código: ${registryCode}`);
+      
+    } catch (error) {
+      console.error('Error processing multi-material exit:', error);
+      alert('Error al procesar la salida de materiales');
+    } finally {
+      setIsProcessingMultiExit(false);
+    }
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
   const filteredItems = items.filter(item => {
     const matchesSearch = searchInventoryItem(item, searchTerm);
+    const matchesName = !nameFilter || item.nombre.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesLocation = !locationFilter || item.ubicacion.toLowerCase().includes(locationFilter.toLowerCase());
+    const matchesCode = !codeFilter || item.codigo.toLowerCase().includes(codeFilter.toLowerCase());
     const puntoPedido = item.puntoPedido || 5;
     const criticalThreshold = Math.floor(puntoPedido / 2);
     const matchesFilter = 
@@ -224,7 +279,7 @@ function App() {
       (stockFilter === 'critical' && item.stock <= criticalThreshold && item.stock > 0) ||
       (stockFilter === 'zero' && item.stock === 0);
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesName && matchesLocation && matchesCode && matchesFilter;
   });
 
   if (!userRole) {
@@ -279,13 +334,15 @@ function App() {
               <span>Cerrar Sesión</span>
             </button>
 
-            {/* 👇 Botón del carrito */}
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
-            >
-              <span>🛒 Carrito ({cartItems.length})</span>
-            </button>
+            {/* Botón del carrito solo para técnicos */}
+            {userRole === 'Tecnico' && (
+              <button
+                onClick={() => setIsCartOpen(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+              >
+                <span>🛒 Carrito ({cartItems.length})</span>
+              </button>
+            )}
             
             {isAdmin && (
               <>
@@ -317,11 +374,22 @@ function App() {
 
         <StatsGrid items={items} />
 
-        {isAdmin && <StockCriticalityCharts items={items} />}
+        {isAdmin && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <StockCriticalityCharts items={items} />
+            <StockTrendsChart items={items} />
+          </div>
+        )}
 
-        <SearchBar
+        <AdvancedSearchBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+          nameFilter={nameFilter}
+          onNameFilterChange={setNameFilter}
+          locationFilter={locationFilter}
+          onLocationFilterChange={setLocationFilter}
+          codeFilter={codeFilter}
+          onCodeFilterChange={setCodeFilter}
           stockFilter={stockFilter}
           onFilterChange={setStockFilter}
           onExportZeroStock={handleExportZeroStock}
@@ -376,9 +444,9 @@ function App() {
                 onDeleteItem={isAdmin ? handleDeleteItem : undefined}
                 isUpdating={updatingItems.has(item.id)}
                 isDeleting={deletingItems.has(item.id)}
-                isViewerMode={!isAdmin}
+                isViewerMode={userRole === 'Tecnico' ? false : !isAdmin}
                 userRole={userRole}
-                onAddToCart={handleAddToCart}   // 👈 NUEVO
+                onAddToCart={userRole === 'Tecnico' ? handleAddToCart : undefined}
               />
             ))}
           </div>
@@ -423,12 +491,23 @@ function App() {
           </>
         )}
 
-        {/* 👇 Aquí renderizamos el modal del carrito */}
+        {/* Modal del carrito */}
         <CartModal
           isOpen={isCartOpen}
           onClose={() => setIsCartOpen(false)}
           cartItems={cartItems}
           onRemoveItem={handleRemoveFromCart}
+          onConfirmExit={handleCartConfirm}
+        />
+
+        {/* Modal de salida múltiple */}
+        <MultiMaterialExitModal
+          isOpen={isMultiExitModalOpen}
+          onClose={() => setIsMultiExitModalOpen(false)}
+          onConfirm={handleMultiMaterialExit}
+          cartItems={cartItems.map(item => ({ item, quantity: 1 }))}
+          isProcessing={isProcessingMultiExit}
+          registryCode={registryApi.getNextRegistryCode()}
         />
       </div>
     </Layout>

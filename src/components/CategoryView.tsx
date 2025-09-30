@@ -250,6 +250,7 @@ export function CategoryView({ items, onUpdateStock, onEditItem, onDeleteItem, o
                       onReassignCategory={(item) => handleReassignCategory(item, category)}
                       isUpdating={updatingItems.has(item.id)}
                       isDeleting={deletingItems.has(item.id)}
+                      userRole={userRole}
                     />
                   ))}
                 </div>
