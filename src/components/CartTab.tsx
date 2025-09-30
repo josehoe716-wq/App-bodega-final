@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Check, Package, Edit3 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Check, Package, CreditCard as Edit3 } from 'lucide-react';
 import { InventoryItem } from '../types/inventory';
 
 interface CartItem {
