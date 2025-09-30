@@ -1,52 +1,136 @@
 import React, { useState, useEffect } from 'react';
 import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings } from 'lucide-react';
-import { MaterialExit } from '../types/materialExit';
-import { materialExitApi } from '../services/materialExitApi';
+import { MaterialExit, CartExit } from '../types/materialExit';
+import { materialExitApi, cartExitApi } from '../services/materialExitApi';
 import { CartExitManagementModal } from './CartExitManagementModal';
 import * as XLSX from 'xlsx';
 
+// Tipo unificado para mostrar todos los movimientos
+interface UnifiedMovement {
+  id: string;
+  type: 'single' | 'cart';
+  date: string;
+  time: string;
+  personName: string;
+  personLastName: string;
+  area: string;
+  ceco?: string;
+  sapCode?: string;
+  workOrder?: string;
+  // Para movimientos individuales
+  materialName?: string;
+  materialCode?: string;
+  materialLocation?: string;
+  materialType?: 'ERSA' | 'UNBW';
+  quantity?: number;
+  remainingStock?: number;
+  // Para movimientos del carrito
+  registryCode?: string;
+  totalItems?: number;
+  totalQuantity?: number;
+  materials?: any[];
+  originalId: number;
+}
+
 export function MovementsTab() {
   const [exits, setExits] = useState<MaterialExit[]>([]);
-  const [filteredExits, setFilteredExits] = useState<MaterialExit[]>([]);
+  const [cartExits, setCartExits] = useState<CartExit[]>([]);
+  const [unifiedMovements, setUnifiedMovements] = useState<UnifiedMovement[]>([]);
+  const [filteredMovements, setFilteredMovements] = useState<UnifiedMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingType, setDeletingType] = useState<'single' | 'cart' | null>(null);
   const [isCartManagementOpen, setIsCartManagementOpen] = useState(false);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [materialTypeFilter, setMaterialTypeFilter] = useState<'all' | 'ERSA' | 'UNBW'>('all');
+  const [movementTypeFilter, setMovementTypeFilter] = useState<'all' | 'single' | 'cart'>('all');
   const [personFilter, setPersonFilter] = useState('');
 
   useEffect(() => {
-    loadExits();
+    loadAllMovements();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [exits, searchTerm, dateFrom, dateTo, materialTypeFilter, personFilter]);
+  }, [unifiedMovements, searchTerm, dateFrom, dateTo, movementTypeFilter, personFilter]);
 
-  const loadExits = async () => {
+  const loadAllMovements = async () => {
     try {
       setLoading(true);
-      const data = await materialExitApi.getAll();
-      setExits(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const [singleExits, cartExitsData] = await Promise.all([
+        materialExitApi.getAll(),
+        cartExitApi.getAll()
+      ]);
+      
+      setExits(singleExits);
+      setCartExits(cartExitsData);
+      
+      // Convertir a formato unificado
+      const unifiedSingle: UnifiedMovement[] = singleExits.map(exit => ({
+        id: `single-${exit.id}`,
+        type: 'single' as const,
+        date: exit.exitDate,
+        time: exit.exitTime,
+        personName: exit.personName,
+        personLastName: exit.personLastName,
+        area: exit.area,
+        ceco: exit.ceco,
+        sapCode: exit.sapCode,
+        workOrder: exit.workOrder,
+        materialName: exit.materialName,
+        materialCode: exit.materialCode,
+        materialLocation: exit.materialLocation,
+        materialType: exit.materialType,
+        quantity: exit.quantity,
+        remainingStock: exit.remainingStock,
+        originalId: exit.id
+      }));
+      
+      const unifiedCart: UnifiedMovement[] = cartExitsData.map(exit => ({
+        id: `cart-${exit.id}`,
+        type: 'cart' as const,
+        date: exit.exitDate,
+        time: exit.exitTime,
+        personName: exit.personName,
+        personLastName: exit.personLastName,
+        area: exit.area,
+        ceco: exit.ceco,
+        sapCode: exit.sapCode,
+        workOrder: exit.workOrder,
+        registryCode: exit.registryCode,
+        totalItems: exit.totalItems,
+        totalQuantity: exit.totalQuantity,
+        materials: exit.materials,
+        originalId: exit.id
+      }));
+      
+      const allMovements = [...unifiedSingle, ...unifiedCart];
+      allMovements.sort((a, b) => {
+        const dateTimeA = new Date(`${a.date} ${a.time}`).getTime();
+        const dateTimeB = new Date(`${b.date} ${b.time}`).getTime();
+        return dateTimeB - dateTimeA;
+      });
+      
+      setUnifiedMovements(allMovements);
     } catch (error) {
-      console.error('Error loading exits:', error);
+      console.error('Error loading movements:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
-    let filtered = [...exits];
+    let filtered = [...unifiedMovements];
 
     // Filtro por término de búsqueda
     if (searchTerm) {
       filtered = filtered.filter(exit =>
-        exit.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exit.materialCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (exit.materialName && exit.materialName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (exit.materialCode && exit.materialCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (exit.registryCode && exit.registryCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
         exit.personName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         exit.personLastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         exit.area.toLowerCase().includes(searchTerm.toLowerCase())
@@ -55,15 +139,15 @@ export function MovementsTab() {
 
     // Filtro por fechas
     if (dateFrom) {
-      filtered = filtered.filter(exit => exit.exitDate >= dateFrom);
+      filtered = filtered.filter(exit => exit.date >= dateFrom);
     }
     if (dateTo) {
-      filtered = filtered.filter(exit => exit.exitDate <= dateTo);
+      filtered = filtered.filter(exit => exit.date <= dateTo);
     }
 
-    // Filtro por tipo de material
-    if (materialTypeFilter !== 'all') {
-      filtered = filtered.filter(exit => exit.materialType === materialTypeFilter);
+    // Filtro por tipo de movimiento
+    if (movementTypeFilter !== 'all') {
+      filtered = filtered.filter(exit => exit.type === movementTypeFilter);
     }
 
     // Filtro por persona
@@ -73,52 +157,89 @@ export function MovementsTab() {
       );
     }
 
-    setFilteredExits(filtered);
+    setFilteredMovements(filtered);
   };
 
-  const handleDeleteExit = async (exitId: number) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este registro de movimiento?')) {
+  const handleDeleteMovement = async (movement: UnifiedMovement) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este registro?')) {
       return;
     }
 
     try {
-      setDeletingId(exitId);
-      await materialExitApi.delete(exitId);
-      await loadExits();
+      setDeletingId(movement.originalId);
+      setDeletingType(movement.type);
+      
+      if (movement.type === 'single') {
+        await materialExitApi.delete(movement.originalId);
+      } else {
+        await cartExitApi.delete(movement.originalId);
+      }
+      
+      await loadAllMovements();
     } catch (error) {
-      console.error('Error deleting exit:', error);
+      console.error('Error deleting movement:', error);
     } finally {
       setDeletingId(null);
+      setDeletingType(null);
     }
   };
 
   const handleExportToExcel = () => {
-    if (filteredExits.length === 0) {
+    if (filteredMovements.length === 0) {
       alert('No hay datos para exportar');
       return;
     }
 
-    const exportData = filteredExits.map(exit => ({
-      'Fecha': exit.exitDate,
-      'Hora': exit.exitTime,
-      'Tipo Material': exit.materialType,
-      'Nombre Material': exit.materialName,
-      'Código': exit.materialCode,
-      'Ubicación': exit.materialLocation,
-      'Cantidad': exit.quantity,
-      'Stock Restante': exit.remainingStock,
-      'Persona': `${exit.personName} ${exit.personLastName}`,
-      'Área': exit.area,
-      'CECO': exit.ceco || '',
-      'Código SAP': exit.sapCode || '',
-      'Orden de Trabajo': exit.workOrder || ''
-    }));
+    const exportData: any[] = [];
+    
+    filteredMovements.forEach(movement => {
+      if (movement.type === 'single') {
+        exportData.push({
+          'Tipo Movimiento': 'Individual',
+          'Código Registro': '',
+          'Fecha': movement.date,
+          'Hora': movement.time,
+          'Tipo Material': movement.materialType,
+          'Nombre Material': movement.materialName,
+          'Código Material': movement.materialCode,
+          'Ubicación': movement.materialLocation,
+          'Cantidad': movement.quantity,
+          'Stock Restante': movement.remainingStock,
+          'Persona': `${movement.personName} ${movement.personLastName}`,
+          'Área': movement.area,
+          'CECO': movement.ceco || '',
+          'Código SAP': movement.sapCode || '',
+          'Orden de Trabajo': movement.workOrder || ''
+        });
+      } else {
+        // Para movimientos del carrito, crear una fila por cada material
+        movement.materials?.forEach(material => {
+          exportData.push({
+            'Tipo Movimiento': 'Carrito',
+            'Código Registro': movement.registryCode,
+            'Fecha': movement.date,
+            'Hora': movement.time,
+            'Tipo Material': material.materialType,
+            'Nombre Material': material.materialName,
+            'Código Material': material.materialCode,
+            'Ubicación': material.materialLocation,
+            'Cantidad': material.quantity,
+            'Stock Restante': material.remainingStock,
+            'Persona': `${movement.personName} ${movement.personLastName}`,
+            'Área': movement.area,
+            'CECO': movement.ceco || '',
+            'Código SAP': movement.sapCode || '',
+            'Orden de Trabajo': movement.workOrder || ''
+          });
+        });
+      }
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Historial de Movimientos');
+    XLSX.utils.book_append_sheet(wb, ws, 'Todos los Movimientos');
     
-    const fileName = `historial_movimientos_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `historial_completo_movimientos_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -126,7 +247,7 @@ export function MovementsTab() {
     setSearchTerm('');
     setDateFrom('');
     setDateTo('');
-    setMaterialTypeFilter('all');
+    setMovementTypeFilter('all');
     setPersonFilter('');
   };
 
@@ -147,7 +268,7 @@ export function MovementsTab() {
           </button>
           <button
             onClick={handleExportToExcel}
-            disabled={filteredExits.length === 0}
+            disabled={filteredMovements.length === 0}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors"
           >
             <Download className="h-4 w-4" />
@@ -163,7 +284,7 @@ export function MovementsTab() {
           <h3 className="text-lg font-semibold text-slate-900">Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {/* Búsqueda general */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -175,7 +296,7 @@ export function MovementsTab() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Material, persona, área..."
+                placeholder="Material, código, persona..."
                 className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -207,40 +328,26 @@ export function MovementsTab() {
             />
           </div>
 
-          {/* Tipo de material */}
+          {/* Tipo de movimiento */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Tipo de material
+              Tipo de movimiento
             </label>
             <select
-              value={materialTypeFilter}
-              onChange={(e) => setMaterialTypeFilter(e.target.value as 'all' | 'ERSA' | 'UNBW')}
+              value={movementTypeFilter}
+              onChange={(e) => setMovementTypeFilter(e.target.value as 'all' | 'single' | 'cart')}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Todos</option>
-              <option value="ERSA">ERSA</option>
-              <option value="UNBW">UNBW</option>
+              <option value="single">Individual</option>
+              <option value="cart">Carrito</option>
             </select>
-          </div>
-
-          {/* Persona */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Persona
-            </label>
-            <input
-              type="text"
-              value={personFilter}
-              onChange={(e) => setPersonFilter(e.target.value)}
-              placeholder="Nombre o apellido"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
           </div>
         </div>
 
         <div className="flex justify-between items-center mt-4">
           <div className="text-sm text-slate-600">
-            Mostrando {filteredExits.length} de {exits.length} registros
+            Mostrando {filteredMovements.length} de {unifiedMovements.length} registros
           </div>
           <button
             onClick={clearFilters}
@@ -251,19 +358,19 @@ export function MovementsTab() {
         </div>
       </div>
 
-      {/* Lista de movimientos */}
+      {/* Tabla de movimientos */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-slate-600">Cargando movimientos...</span>
           </div>
-        ) : filteredExits.length === 0 ? (
+        ) : filteredMovements.length === 0 ? (
           <div className="text-center py-12">
             <History className="h-12 w-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay movimientos</h3>
             <p className="text-slate-600">
-              {exits.length === 0 
+              {unifiedMovements.length === 0 
                 ? 'No se han registrado movimientos aún'
                 : 'No hay movimientos que coincidan con los filtros aplicados'
               }
@@ -275,10 +382,13 @@ export function MovementsTab() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Fecha/Hora
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Material
+                    Detalles
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Cantidad
@@ -295,45 +405,77 @@ export function MovementsTab() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {filteredExits.map((exit) => (
-                  <tr key={exit.id} className="hover:bg-slate-50">
+                {filteredMovements.map((movement) => (
+                  <tr key={movement.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        movement.type === 'single' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {movement.type === 'single' ? 'Individual' : 'Carrito'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-slate-400" />
                         <div>
-                          <div className="text-sm font-medium text-slate-900">{exit.exitDate}</div>
-                          <div className="text-sm text-slate-500">{exit.exitTime}</div>
+                          <div className="text-sm font-medium text-slate-900">{movement.date}</div>
+                          <div className="text-sm text-slate-500">{movement.time}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        <Package className="h-4 w-4 text-slate-400" />
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 text-xs font-medium rounded ${
-                              exit.materialType === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {exit.materialType}
-                            </span>
-                            <span className="text-sm font-medium text-slate-900">{exit.materialName}</span>
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            Código: {exit.materialCode} • {exit.materialLocation}
+                      {movement.type === 'single' ? (
+                        <div className="flex items-center space-x-3">
+                          <Package className="h-4 w-4 text-slate-400" />
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                movement.materialType === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {movement.materialType}
+                              </span>
+                              <span className="text-sm font-medium text-slate-900">{movement.materialName}</span>
+                            </div>
+                            <div className="text-sm text-slate-500">
+                              Código: {movement.materialCode} • {movement.materialLocation}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="flex items-center space-x-3">
+                          <Package className="h-4 w-4 text-purple-400" />
+                          <div>
+                            <div className="text-sm font-medium text-slate-900">
+                              Código: #{movement.registryCode}
+                            </div>
+                            <div className="text-sm text-slate-500">
+                              {movement.totalItems} tipos de materiales
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-red-600">-{exit.quantity}</div>
-                      <div className="text-sm text-slate-500">Stock: {exit.remainingStock}</div>
+                      {movement.type === 'single' ? (
+                        <div>
+                          <div className="text-sm font-semibold text-red-600">-{movement.quantity}</div>
+                          <div className="text-sm text-slate-500">Stock: {movement.remainingStock}</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-sm font-semibold text-purple-600">{movement.totalQuantity} unidades</div>
+                          <div className="text-sm text-slate-500">{movement.totalItems} tipos</div>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-slate-400" />
                         <div>
                           <div className="text-sm font-medium text-slate-900">
-                            {exit.personName} {exit.personLastName}
+                            {movement.personName} {movement.personLastName}
                           </div>
                         </div>
                       </div>
@@ -342,22 +484,22 @@ export function MovementsTab() {
                       <div className="flex items-center space-x-2">
                         <Building className="h-4 w-4 text-slate-400" />
                         <div>
-                          <div className="text-sm font-medium text-slate-900">{exit.area}</div>
+                          <div className="text-sm font-medium text-slate-900">{movement.area}</div>
                           <div className="text-sm text-slate-500">
-                            {exit.ceco && `CECO: ${exit.ceco}`}
-                            {exit.workOrder && ` • OT: ${exit.workOrder}`}
+                            {movement.ceco && `CECO: ${movement.ceco}`}
+                            {movement.workOrder && ` • OT: ${movement.workOrder}`}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
-                        onClick={() => handleDeleteExit(exit.id)}
-                        disabled={deletingId === exit.id}
+                        onClick={() => handleDeleteMovement(movement)}
+                        disabled={deletingId === movement.originalId && deletingType === movement.type}
                         className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
                         title="Eliminar registro"
                       >
-                        {deletingId === exit.id ? (
+                        {deletingId === movement.originalId && deletingType === movement.type ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
                         ) : (
                           <Trash2 className="h-4 w-4" />

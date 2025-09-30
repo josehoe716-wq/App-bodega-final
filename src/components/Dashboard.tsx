@@ -29,10 +29,10 @@ export function Dashboard({ items }: DashboardProps) {
         cartExitApi.getAll()
       ]);
       
-      // Obtener los últimos 10 movimientos
+      // Obtener los últimos 5 movimientos individuales
       const sortedExits = exits
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 10);
+        .slice(0, 5);
       setRecentExits(sortedExits);
       
       // Obtener las últimas 5 salidas del carrito
