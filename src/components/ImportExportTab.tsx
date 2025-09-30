@@ -51,26 +51,34 @@ export function ImportExportTab({ onImportItems, isImporting, cartExits = [] }: 
       return;
     }
 
-    const exportData = cartExits.map(exit => ({
-      'Código de Registro': exit.registryCode || '',
-      'Fecha': exit.exitDate,
-      'Hora': exit.exitTime,
-      'Tipo Material': exit.materialType,
-      'Nombre Material': exit.materialName,
-      'Código': exit.materialCode,
-      'Ubicación': exit.materialLocation,
-      'Cantidad': exit.quantity,
-      'Persona': `${exit.personName} ${exit.personLastName}`,
-      'Área': exit.area,
-      'CECO': exit.ceco || '',
-      'Código SAP': exit.sapCode || '',
-      'Orden de Trabajo': exit.workOrder || ''
-    }));
+    // Crear una fila por cada material en cada salida del carrito
+    const exportData: any[] = [];
+
+    cartExits.forEach(exit => {
+      exit.materials.forEach(material => {
+        exportData.push({
+          'Código de Registro': exit.registryCode || '',
+          'Fecha': exit.exitDate,
+          'Hora': exit.exitTime,
+          'Tipo Material': material.materialType,
+          'Nombre Material': material.materialName,
+          'Código': material.materialCode,
+          'Ubicación': material.materialLocation,
+          'Cantidad': material.quantity,
+          'Stock Restante': material.remainingStock,
+          'Persona': `${exit.personName} ${exit.personLastName}`,
+          'Área': exit.area,
+          'CECO': exit.ceco || '',
+          'Código SAP': exit.sapCode || '',
+          'Orden de Trabajo': exit.workOrder || ''
+        });
+      });
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Salidas del Carrito');
-    
+
     const fileName = `salidas_carrito_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
@@ -155,13 +163,19 @@ export function ImportExportTab({ onImportItems, isImporting, cartExits = [] }: 
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="text-lg font-semibold text-slate-900">{cartExits.length}</div>
                   <div className="text-sm text-slate-600">Registros de salidas del carrito</div>
                 </div>
                 <Package className="h-8 w-8 text-slate-400" />
               </div>
+              {cartExits.length > 0 && (
+                <div className="text-sm text-slate-600 space-y-1 pt-3 border-t border-slate-200">
+                  <div>Total de materiales: {cartExits.reduce((sum, exit) => sum + exit.totalItems, 0)}</div>
+                  <div>Total de unidades: {cartExits.reduce((sum, exit) => sum + exit.totalQuantity, 0)}</div>
+                </div>
+              )}
             </div>
 
             <button

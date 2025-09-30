@@ -13,7 +13,7 @@ import { CartModal } from './components/CartModal';
 import { InventoryItem, NewInventoryItem } from './types/inventory';
 import { inventoryApi } from './services/api';
 import { cartExitApi } from './services/materialExitApi';
-import { NewCartExit } from './types/materialExit';
+import { NewCartExit, CartExit } from './types/materialExit';
 import { registryApi } from "./services/registryApi";
 
 interface CartItem {
@@ -39,9 +39,13 @@ function App() {
   // Estado para el código de registro
   const [registryCode, setRegistryCode] = useState('');
 
+  // Estado para las salidas del carrito
+  const [cartExits, setCartExits] = useState<CartExit[]>([]);
+
   useEffect(() => {
     if (userRole) {
       loadInventory();
+      loadCartExits();
       // Establecer pestaña inicial según el rol
       if (userRole === 'administrador') {
         setActiveTab('dashboard');
@@ -60,6 +64,15 @@ function App() {
       console.error('Error loading inventory:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCartExits = async () => {
+    try {
+      const data = await cartExitApi.getAll();
+      setCartExits(data);
+    } catch (error) {
+      console.error('Error loading cart exits:', error);
     }
   };
 
@@ -164,8 +177,9 @@ function App() {
         await inventoryApi.updateStock(cartItem.item.id, newStock);
       }
 
-      // Recargar inventario
+      // Recargar inventario y salidas del carrito
       await loadInventory();
+      await loadCartExits();
 
       // Limpiar carrito y cerrar modales
       setCartItems([]);
@@ -205,10 +219,10 @@ function App() {
         return <div>Reportes - En desarrollo</div>;
       case 'import-export':
         return (
-          <ImportExportTab 
+          <ImportExportTab
             onImportItems={handleImportItems}
             isImporting={isImporting}
-            cartExits={[]} // Aquí deberías pasar los datos reales de salidas del carrito
+            cartExits={cartExits}
           />
         );
       case 'settings':
