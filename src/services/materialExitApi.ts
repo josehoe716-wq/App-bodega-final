@@ -118,6 +118,18 @@ export const materialExitApi = {
       return true;
     }
     return false;
+  },
+
+  async update(id: number, updatedData: Partial<MaterialExit>): Promise<MaterialExit | null> {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    currentExits = loadExitsFromStorage();
+    const exitIndex = currentExits.findIndex(exit => exit.id === id);
+    if (exitIndex !== -1) {
+      currentExits[exitIndex] = { ...currentExits[exitIndex], ...updatedData };
+      saveExitsToStorage(currentExits);
+      return currentExits[exitIndex];
+    }
+    return null;
   }
 };
 
@@ -185,5 +197,17 @@ export const cartExitApi = {
       return true;
     }
     return false;
+  },
+
+  async update(id: number, updatedData: Partial<CartExit>): Promise<CartExit | null> {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    currentCartExits = loadCartExitsFromStorage();
+    const exitIndex = currentCartExits.findIndex(exit => exit.id === id);
+    if (exitIndex !== -1) {
+      currentCartExits[exitIndex] = { ...currentCartExits[exitIndex], ...updatedData };
+      saveCartExitsToStorage(currentCartExits);
+      return currentCartExits[exitIndex];
+    }
+    return null;
   }
 };
