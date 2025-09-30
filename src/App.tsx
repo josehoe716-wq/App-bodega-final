@@ -126,44 +126,52 @@ function App() {
   };
 
   const handleMultiMaterialExit = async (exitData: NewCartExit, cartItemsWithQuantities: CartItem[]) => {
-    try {
-      setIsProcessingMultiExit(true);
-      
-      // Crear la salida del carrito
-      const materials = cartItemsWithQuantities.map(cartItem => ({
-        materialId: cartItem.item.id,
-        quantity: cartItem.quantity
-      }));
-      
-      const newCartExit = await cartExitApi.create({
+  try {
+    setIsProcessingMultiExit(true);
+
+    // Crear la lista de materiales del carrito
+    const materials = cartItemsWithQuantities.map(cartItem => ({
+      materialId: cartItem.item.id,
+      quantity: cartItem.quantity
+    }));
+
+    // Generar un nuevo código de registro
+    const newCode = registryApi.getNextRegistryCode();
+
+    // Crear la salida del carrito con el código incluido
+    const newCartExit = await cartExitApi.create(
+      {
         ...exitData,
+        registryCode: newCode, // 👈 agregamos el código único
         materials
-      }, cartItemsWithQuantities.map(ci => ci.item));
-      
-      // Procesar cada material del carrito
-      for (const cartItem of cartItemsWithQuantities) {
-        // Actualizar el stock del material
-        const newStock = cartItem.item.stock - cartItem.quantity;
-        await inventoryApi.updateStock(cartItem.item.id, newStock);
-      }
-      
-      // Recargar inventario
-      await loadInventory();
-      
-      // Limpiar carrito y cerrar modales
-      setCartItems([]);
-      setIsMultiExitModalOpen(false);
-      
-      // Mostrar mensaje de éxito
-      alert(`Salida registrada exitosamente con código: ${newCartExit.registryCode}`);
-      
-    } catch (error) {
-      console.error('Error processing multi-material exit:', error);
-      alert('Error al procesar la salida de materiales');
-    } finally {
-      setIsProcessingMultiExit(false);
+      },
+      cartItemsWithQuantities.map(ci => ci.item)
+    );
+
+    // Actualizar el stock de cada material
+    for (const cartItem of cartItemsWithQuantities) {
+      const newStock = cartItem.item.stock - cartItem.quantity;
+      await inventoryApi.updateStock(cartItem.item.id, newStock);
     }
-  };
+
+    // Recargar inventario
+    await loadInventory();
+
+    // Limpiar carrito y cerrar modales
+    setCartItems([]);
+    setIsMultiExitModalOpen(false);
+
+    // Mostrar mensaje de éxito con el código generado
+    alert(`Salida registrada exitosamente con código: ${newCartExit.registryCode}`);
+
+  } catch (error) {
+    console.error('Error processing multi-material exit:', error);
+    alert('Error al procesar la salida de materiales');
+  } finally {
+    setIsProcessingMultiExit(false);
+  }
+};
+
 
   const renderTabContent = () => {
     switch (activeTab) {
