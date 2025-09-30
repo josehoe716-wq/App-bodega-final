@@ -9,6 +9,7 @@ import { CartHistoryTab } from './components/CartHistoryTab';
 import { InventoryTab } from './components/InventoryTab';
 import { AuthModal } from './components/AuthModal';
 import { MultiMaterialExitModal } from './components/MultiMaterialExitModal';
+import { CartModal } from './components/CartModal';
 import { InventoryItem, NewInventoryItem } from './types/inventory';
 import { inventoryApi } from './services/api';
 import { cartExitApi } from './services/materialExitApi';
