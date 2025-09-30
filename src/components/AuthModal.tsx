@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, User, Shield } from 'lucide-react';
+import { X, Lock, User, Shield, LogIn } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,20 +13,27 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleTechnicianLogin = () => {
+    onLogin('Tecnico');
+    onClose();
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Si es técnico, no necesita contraseña
+    if (selectedRole === 'Tecnico') {
+      handleTechnicianLogin();
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
 
     // Simular validación de contraseña
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const passwords = {
-      Tecnico: 'Tecnico123',
-      administrador: 'admin123'
-    };
-
-    if (password === passwords[selectedRole]) {
+    if (password === 'admin123') {
       onLogin(selectedRole);
       setPassword('');
       onClose();
@@ -71,7 +78,11 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
             <div className="grid grid-cols-1 gap-3">
               <button
                 type="button"
-                onClick={() => setSelectedRole('Tecnico')}
+                onClick={() => {
+                  setSelectedRole('Tecnico');
+                  setPassword('');
+                  setError('');
+                }}
                 className={`flex items-center space-x-3 p-4 border-2 rounded-lg transition-colors ${
                   selectedRole === 'Tecnico'
                     ? 'border-blue-500 bg-blue-50'
@@ -81,13 +92,16 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
                 <User className="h-5 w-5 text-blue-600" />
                 <div className="text-left">
                   <div className="font-medium text-slate-900">Tecnico</div>
-                  <div className="text-sm text-slate-600">Visualizar y registrar salidas</div>
+                  <div className="text-sm text-slate-600">Acceso directo - Sin contraseña</div>
                 </div>
               </button>
               
               <button
                 type="button"
-                onClick={() => setSelectedRole('administrador')}
+                onClick={() => {
+                  setSelectedRole('administrador');
+                  setError('');
+                }}
                 className={`flex items-center space-x-3 p-4 border-2 rounded-lg transition-colors ${
                   selectedRole === 'administrador'
                     ? 'border-blue-500 bg-blue-50'
@@ -103,7 +117,8 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
             </div>
           </div>
 
-          <div>
+          {selectedRole === 'administrador' && (
+            <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
               Contraseña
             </label>
@@ -113,21 +128,16 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              placeholder={`Contraseña para ${selectedRole}`}
-              required
+              placeholder="Contraseña de administrador"
+              required={selectedRole === 'administrador'}
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-            <p className="text-xs text-slate-600 mb-2">Credenciales de prueba:</p>
-            <p className="text-xs text-slate-700">• Tecnico: <code>Tecnico123</code></p>
-            <p className="text-xs text-slate-700">• Administrador: <code>admin123</code></p>
-          </div>
+          )}
 
           <button
             type="submit"
-            disabled={isLoading || !password}
+            disabled={isLoading || (selectedRole === 'administrador' && !password)}
             className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors flex items-center justify-center space-x-2"
           >
             {isLoading ? (
@@ -137,8 +147,8 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
               </>
             ) : (
               <>
-                <Lock className="h-4 w-4" />
-                <span>Iniciar Sesión</span>
+                {selectedRole === 'Tecnico' ? <LogIn className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                <span>{selectedRole === 'Tecnico' ? 'Acceder como Técnico' : 'Iniciar Sesión'}</span>
               </>
             )}
           </button>
