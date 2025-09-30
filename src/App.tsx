@@ -5,12 +5,14 @@ import { MovementsTab } from './components/MovementsTab';
 import { ImportExportTab } from './components/ImportExportTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CartTab } from './components/CartTab';
+import { CartHistoryTab } from './components/CartHistoryTab';
 import { InventoryTab } from './components/InventoryTab';
 import { AuthModal } from './components/AuthModal';
 import { MultiMaterialExitModal } from './components/MultiMaterialExitModal';
 import { InventoryItem, NewInventoryItem } from './types/inventory';
 import { inventoryApi } from './services/api';
-import { registryApi } from './services/registryApi';
+import { cartExitApi } from './services/materialExitApi';
+import { NewCartExit } from './types/materialExit';
 
 interface CartItem {
   item: InventoryItem;
@@ -112,9 +114,20 @@ function App() {
     setCartItems([]);
   };
 
-  const handleMultiMaterialExit = async (exitData: any, cartItemsWithQuantities: CartItem[], registryCode: string) => {
+  const handleMultiMaterialExit = async (exitData: NewCartExit, cartItemsWithQuantities: CartItem[]) => {
     try {
       setIsProcessingMultiExit(true);
+      
+      // Crear la salida del carrito
+      const materials = cartItemsWithQuantities.map(cartItem => ({
+        materialId: cartItem.item.id,
+        quantity: cartItem.quantity
+      }));
+      
+      const newCartExit = await cartExitApi.create({
+        ...exitData,
+        materials
+      }, cartItemsWithQuantities.map(ci => ci.item));
       
       // Procesar cada material del carrito
       for (const cartItem of cartItemsWithQuantities) {
@@ -131,7 +144,7 @@ function App() {
       setIsMultiExitModalOpen(false);
       
       // Mostrar mensaje de éxito
-      alert(`Salida registrada exitosamente con código: ${registryCode}`);
+      alert(`Salida registrada exitosamente con código: ${newCartExit.registryCode}`);
       
     } catch (error) {
       console.error('Error processing multi-material exit:', error);
@@ -177,6 +190,8 @@ function App() {
             onClearCart={clearCart}
           />
         );
+      case 'cart-history':
+        return <CartHistoryTab />;
       default:
         return <Dashboard items={items} />;
     }

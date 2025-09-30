@@ -203,13 +203,6 @@ export function InventoryTab({ items, onReloadInventory, userRole, onAddToCart }
               <span>Borrar Todo</span>
             </button>
             <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              <span>Importar Excel</span>
-            </button>
-            <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
             >

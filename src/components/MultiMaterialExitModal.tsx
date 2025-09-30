@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, ShoppingCart, Package, User, Building, Hash, Calendar } from 'lucide-react';
 import { InventoryItem } from '../types/inventory';
-import { NewMaterialExit } from '../types/materialExit';
+import { NewCartExit } from '../types/materialExit';
 
 interface CartItem {
   item: InventoryItem;
@@ -11,10 +11,9 @@ interface CartItem {
 interface MultiMaterialExitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (exitData: NewMaterialExit, items: CartItem[], registryCode: string) => void;
+  onConfirm: (exitData: NewCartExit, items: CartItem[]) => void;
   cartItems: CartItem[];
   isProcessing: boolean;
-  registryCode: string;
 }
 
 export function MultiMaterialExitModal({ 
@@ -23,23 +22,21 @@ export function MultiMaterialExitModal({
   onConfirm, 
   cartItems, 
   isProcessing,
-  registryCode 
 }: MultiMaterialExitModalProps) {
-  const [formData, setFormData] = useState<NewMaterialExit>({
-    materialId: 0,
-    quantity: 1,
+  const [formData, setFormData] = useState<NewCartExit>({
     personName: '',
     personLastName: '',
     area: '',
     ceco: '',
     sapCode: '',
     workOrder: '',
+    materials: []
   });
 
-  const [errors, setErrors] = useState<Partial<NewMaterialExit>>({});
+  const [errors, setErrors] = useState<Partial<NewCartExit>>({});
 
   const validateForm = () => {
-    const newErrors: Partial<NewMaterialExit> = {};
+    const newErrors: Partial<NewCartExit> = {};
 
     if (!formData.personName.trim()) {
       newErrors.personName = 'El nombre es requerido';
@@ -67,10 +64,10 @@ export function MultiMaterialExitModal({
     e.preventDefault();
     if (!validateForm()) return;
 
-    onConfirm(formData, cartItems, registryCode);
+    onConfirm(formData, cartItems);
   };
 
-  const handleInputChange = (field: keyof NewMaterialExit, value: string | number) => {
+  const handleInputChange = (field: keyof NewCartExit, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
@@ -79,14 +76,13 @@ export function MultiMaterialExitModal({
 
   const handleClose = () => {
     setFormData({
-      materialId: 0,
-      quantity: 1,
       personName: '',
       personLastName: '',
       area: '',
       ceco: '',
       sapCode: '',
       workOrder: '',
+      materials: []
     });
     setErrors({});
     onClose();
@@ -109,7 +105,7 @@ export function MultiMaterialExitModal({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Registrar Salida Múltiple</h2>
-              <p className="text-sm text-slate-600">Código de registro: <span className="font-mono font-bold text-orange-600">{registryCode}</span></p>
+              <p className="text-sm text-slate-600">Se generará un código de registro automáticamente</p>
             </div>
           </div>
           <button
@@ -292,7 +288,7 @@ export function MultiMaterialExitModal({
               ) : (
                 <>
                   <ShoppingCart className="h-4 w-4" />
-                  <span>Registrar Salida ({registryCode})</span>
+                  <span>Registrar Salida</span>
                 </>
               )}
             </button>

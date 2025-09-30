@@ -31,6 +31,7 @@ export function Sidebar({ activeTab, onTabChange, userRole, onLogout, cartItemsC
   const technicianTabs = [
     { id: 'inventory', label: 'Inventario', icon: Package },
     { id: 'cart', label: `Carrito (${cartItemsCount})`, icon: ShoppingCart },
+    { id: 'cart-history', label: 'Historial de Salidas', icon: History },
   ];
 
   const tabs = userRole === 'administrador' ? adminTabs : technicianTabs;

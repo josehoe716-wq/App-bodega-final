@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Package, TrendingUp, Clock, Eye } from 'lucide-react';
 import { InventoryItem } from '../types/inventory';
-import { MaterialExit } from '../types/materialExit';
-import { materialExitApi } from '../services/materialExitApi';
+import { MaterialExit, CartExit } from '../types/materialExit';
+import { materialExitApi, cartExitApi } from '../services/materialExitApi';
 import { StatsGrid } from './StatsGrid';
 import { StockCriticalityCharts } from './StockCriticalityCharts';
-import { StockTrendsChart } from './StockTrendsChart';
+import { CategoryDistributionChart } from './CategoryDistributionChart';
 
 interface DashboardProps {
   items: InventoryItem[];
@@ -13,6 +13,7 @@ interface DashboardProps {
 
 export function Dashboard({ items }: DashboardProps) {
   const [recentExits, setRecentExits] = useState<MaterialExit[]>([]);
+  const [recentCartExits, setRecentCartExits] = useState<CartExit[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,12 +23,22 @@ export function Dashboard({ items }: DashboardProps) {
   const loadRecentExits = async () => {
     try {
       setLoading(true);
-      const exits = await materialExitApi.getAll();
+      const [exits, cartExits] = await Promise.all([
+        materialExitApi.getAll(),
+        cartExitApi.getAll()
+      ]);
+      
       // Obtener los últimos 10 movimientos
       const sortedExits = exits
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10);
       setRecentExits(sortedExits);
+      
+      // Obtener las últimas 5 salidas del carrito
+      const sortedCartExits = cartExits
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      setRecentCartExits(sortedCartExits);
     } catch (error) {
       console.error('Error loading recent exits:', error);
     } finally {
@@ -51,7 +62,7 @@ export function Dashboard({ items }: DashboardProps) {
       {/* Gráficas */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <StockCriticalityCharts items={items} />
-        <StockTrendsChart items={items} />
+        <CategoryDistributionChart items={items} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -100,6 +111,29 @@ export function Dashboard({ items }: DashboardProps) {
                   <div className="text-right">
                     <div className="text-sm font-semibold text-slate-900">-{exit.quantity}</div>
                     <div className="text-xs text-slate-500">Stock: {exit.remainingStock}</div>
+                  </div>
+                </div>
+              ))}
+              {recentCartExits.map((cartExit) => (
+                <div key={`cart-${cartExit.id}`} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700">
+                        CARRITO
+                      </span>
+                      <span className="text-sm font-medium text-slate-900">#{cartExit.registryCode}</span>
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      <span>{cartExit.personName} {cartExit.personLastName}</span>
+                      <span className="mx-2">•</span>
+                      <span>{cartExit.area}</span>
+                      <span className="mx-2">•</span>
+                      <span>{cartExit.exitDate} {cartExit.exitTime}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-slate-900">{cartExit.totalItems} items</div>
+                    <div className="text-xs text-slate-500">{cartExit.totalQuantity} unidades</div>
                   </div>
                 </div>
               ))}
