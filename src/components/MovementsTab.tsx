@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings, CreditCard as Edit } from 'lucide-react'rt { MaterialExit, CartExit } from '../types/materialExit';
+import { History, Download, Filter, Calendar, Search, Trash2, User, Building, Package, Settings, CreditCard as Edit } from 'lucide-react';
+import { MaterialExit, CartExit } from '../types/materialExit';
 import { materialExitApi, cartExitApi } from '../services/materialExitApi';
 import { CartExitManagementModal } from './CartExitManagementModal';
 import * as XLSX from 'xlsx';
