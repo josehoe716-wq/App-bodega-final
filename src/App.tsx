@@ -253,8 +253,9 @@ function App() {
         onConfirm={handleMultiMaterialExit}
         cartItems={cartItems.map(item => ({ item, quantity: 1 }))}
         isProcessing={isProcessingMultiExit}
-        registryCode={registryApi.getNextRegistryCode()}
+        registryCode={registryCode}
       />
+
     </div>
   );
 }
