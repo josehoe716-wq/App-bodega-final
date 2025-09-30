@@ -8,20 +8,46 @@ import { StockCriticalityCharts } from './StockCriticalityCharts';
 import { CategoryDistributionChart } from './CategoryDistributionChart';
 import { StockTrendsChart } from './StockTrendsChart';
 
+// Tipo unificado para mostrar todos los movimientos
+interface UnifiedMovement {
+  id: string;
+  type: 'single' | 'cart';
+  date: string;
+  time: string;
+  personName: string;
+  personLastName: string;
+  area: string;
+  ceco?: string;
+  sapCode?: string;
+  workOrder?: string;
+  // Para movimientos individuales
+  materialName?: string;
+  materialCode?: string;
+  materialLocation?: string;
+  materialType?: 'ERSA' | 'UNBW';
+  quantity?: number;
+  remainingStock?: number;
+  // Para movimientos del carrito
+  registryCode?: string;
+  totalItems?: number;
+  totalQuantity?: number;
+  materials?: any[];
+  originalId: number;
+}
+
 interface DashboardProps {
   items: InventoryItem[];
 }
 
 export function Dashboard({ items }: DashboardProps) {
-  const [recentExits, setRecentExits] = useState<MaterialExit[]>([]);
-  const [recentCartExits, setRecentCartExits] = useState<CartExit[]>([]);
+  const [recentMovements, setRecentMovements] = useState<UnifiedMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadRecentExits();
+    loadRecentMovements();
   }, []);
 
-  const loadRecentExits = async () => {
+  const loadRecentMovements = async () => {
     try {
       setLoading(true);
       const [exits, cartExits] = await Promise.all([
@@ -29,19 +55,57 @@ export function Dashboard({ items }: DashboardProps) {
         cartExitApi.getAll()
       ]);
       
-      // Obtener los últimos 5 movimientos individuales
-      const sortedExits = exits
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 5);
-      setRecentExits(sortedExits);
+      // Convertir a formato unificado
+      const unifiedSingle: UnifiedMovement[] = exits.map(exit => ({
+        id: `single-${exit.id}`,
+        type: 'single' as const,
+        date: exit.exitDate,
+        time: exit.exitTime,
+        personName: exit.personName,
+        personLastName: exit.personLastName,
+        area: exit.area,
+        ceco: exit.ceco,
+        sapCode: exit.sapCode,
+        workOrder: exit.workOrder,
+        materialName: exit.materialName,
+        materialCode: exit.materialCode,
+        materialLocation: exit.materialLocation,
+        materialType: exit.materialType,
+        quantity: exit.quantity,
+        remainingStock: exit.remainingStock,
+        originalId: exit.id
+      }));
       
-      // Obtener las últimas 5 salidas del carrito
-      const sortedCartExits = cartExits
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 5);
-      setRecentCartExits(sortedCartExits);
+      const unifiedCart: UnifiedMovement[] = cartExits.map(exit => ({
+        id: `cart-${exit.id}`,
+        type: 'cart' as const,
+        date: exit.exitDate,
+        time: exit.exitTime,
+        personName: exit.personName,
+        personLastName: exit.personLastName,
+        area: exit.area,
+        ceco: exit.ceco,
+        sapCode: exit.sapCode,
+        workOrder: exit.workOrder,
+        registryCode: exit.registryCode,
+        totalItems: exit.totalItems,
+        totalQuantity: exit.totalQuantity,
+        materials: exit.materials,
+        originalId: exit.id
+      }));
+      
+      // Combinar y ordenar todos los movimientos
+      const allMovements = [...unifiedSingle, ...unifiedCart];
+      allMovements.sort((a, b) => {
+        const dateTimeA = new Date(`${a.date} ${a.time}`).getTime();
+        const dateTimeB = new Date(`${b.date} ${b.time}`).getTime();
+        return dateTimeB - dateTimeA;
+      });
+      
+      // Obtener los últimos 10 movimientos
+      setRecentMovements(allMovements.slice(0, 10));
     } catch (error) {
-      console.error('Error loading recent exits:', error);
+      console.error('Error loading recent movements:', error);
     } finally {
       setLoading(false);
     }
@@ -86,59 +150,69 @@ export function Dashboard({ items }: DashboardProps) {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
-          ) : recentExits.length === 0 ? (
+          ) : recentMovements.length === 0 ? (
             <div className="text-center py-8">
               <Eye className="h-12 w-12 text-slate-400 mx-auto mb-3" />
               <p className="text-slate-600">No hay movimientos registrados</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {recentExits.map((exit) => (
-                <div key={exit.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className={`px-2 py-1 text-xs font-medium rounded ${
-                        exit.materialType === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {exit.materialType}
-                      </span>
-                      <span className="text-sm font-medium text-slate-900">{exit.materialName}</span>
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      <span>{exit.personName} {exit.personLastName}</span>
-                      <span className="mx-2">•</span>
-                      <span>{exit.area}</span>
-                      <span className="mx-2">•</span>
-                      <span>{exit.exitDate} {exit.exitTime}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-slate-900">-{exit.quantity}</div>
-                    <div className="text-xs text-slate-500">Stock: {exit.remainingStock}</div>
-                  </div>
-                </div>
-              ))}
-              {recentCartExits.map((cartExit) => (
-                <div key={`cart-${cartExit.id}`} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700">
-                        CARRITO
-                      </span>
-                      <span className="text-sm font-medium text-slate-900">#{cartExit.registryCode}</span>
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      <span>{cartExit.personName} {cartExit.personLastName}</span>
-                      <span className="mx-2">•</span>
-                      <span>{cartExit.area}</span>
-                      <span className="mx-2">•</span>
-                      <span>{cartExit.exitDate} {cartExit.exitTime}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-slate-900">{cartExit.totalItems} items</div>
-                    <div className="text-xs text-slate-500">{cartExit.totalQuantity} unidades</div>
-                  </div>
+              {recentMovements.map((movement) => (
+                <div 
+                  key={movement.id} 
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    movement.type === 'single' 
+                      ? 'bg-slate-50' 
+                      : 'bg-purple-50 border border-purple-200'
+                  }`}
+                >
+                  {movement.type === 'single' ? (
+                    <>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`px-2 py-1 text-xs font-medium rounded ${
+                            movement.materialType === 'ERSA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {movement.materialType}
+                          </span>
+                          <span className="text-sm font-medium text-slate-900">{movement.materialName}</span>
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          <span>{movement.personName} {movement.personLastName}</span>
+                          <span className="mx-2">•</span>
+                          <span>{movement.area}</span>
+                          <span className="mx-2">•</span>
+                          <span>{movement.date} {movement.time}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-slate-900">-{movement.quantity}</div>
+                        <div className="text-xs text-slate-500">Stock: {movement.remainingStock}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700">
+                            CARRITO
+                          </span>
+                          <span className="text-sm font-medium text-slate-900">#{movement.registryCode}</span>
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          <span>{movement.personName} {movement.personLastName}</span>
+                          <span className="mx-2">•</span>
+                          <span>{movement.area}</span>
+                          <span className="mx-2">•</span>
+                          <span>{movement.date} {movement.time}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-slate-900">{movement.totalItems} tipos</div>
+                        <div className="text-xs text-slate-500">{movement.totalQuantity} unidades</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
